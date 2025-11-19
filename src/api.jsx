@@ -1,14 +1,17 @@
 import axios from 'axios';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+// IMPORTANT: Backend URL should NOT end with /api
+const API_BASE_URL =
+  import.meta.env.VITE_API_URL ||
+  'https://interior-backend-production.up.railway.app';
 
 // Create axios instance with default config
 const api = axios.create({
-  baseURL: API_BASE_URL,
-  timeout: 120000, // 2 minutes timeout for AI generation
+  baseURL: `${API_BASE_URL}/api`, // API prefix added here
+  timeout: 120000,
   headers: {
-    'Content-Type': 'application/json'
-  }
+    'Content-Type': 'application/json',
+  },
 });
 
 // API functions
@@ -17,7 +20,7 @@ export const generateDesign = async (roomType, style, customPrompt) => {
     const response = await api.post('/generate-design', {
       room_type: roomType,
       style: style,
-      custom_prompt: customPrompt
+      custom_prompt: customPrompt,
     });
     return response.data;
   } catch (error) {
