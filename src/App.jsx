@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Sparkles, Download, Home, Bed, Utensils, Bath, Briefcase, UtensilsCrossed, Loader2, AlertCircle, CheckCircle } from 'lucide-react';
 import { generateDesign, checkHealth } from './api';
+import RegistrationModal from './RegistrationModal';
 import './App.css';
 
 const App = () => {
@@ -12,15 +13,13 @@ const App = () => {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [apiStatus, setApiStatus] = useState('checking');
+  
+  // Registration state
+  const [showRegistrationModal, setShowRegistrationModal] = useState(false);
+  const [generationCount, setGenerationCount] = useState(0);
+  const [isVerified, setIsVerified] = useState(false);
+  const [userEmail, setUserEmail] = useState('');
 
-  // const rooms = [
-  //   { id: 'master_bedroom', name: 'Master Bedroom', icon: Bed },
-  //   { id: 'living_room', name: 'Living Room', icon: Home },
-  //   { id: 'kitchen', name: 'Kitchen', icon: Utensils },
-  //   { id: 'main_bathroom', name: 'Main Bathroom', icon: Bath },
-  //   { id: 'home_office', name: 'Home Office', icon: Briefcase },
-  //   { id: 'dining_room', name: 'Dining Room', icon: UtensilsCrossed }
-  // ];
   const rooms = [
     { id: 'master_bedroom', name: 'Master Bedroom', icon: Bed },
     { id: 'bedroom_1', name: 'Bedroom 1', icon: Home },
@@ -29,6 +28,7 @@ const App = () => {
     { id: 'kitchen', name: 'Kitchen', icon: Briefcase },
     { id: 'dining_room', name: 'Dining Room', icon: UtensilsCrossed }
   ];
+
   const styles = [
     { id: 'modern', name: 'Modern' },
     { id: 'scandinavian', name: 'Scandinavian' },
@@ -48,7 +48,54 @@ const App = () => {
       }
     };
     checkApiHealth();
+
+    // Load generation count and user info from localStorage
+    const savedCount = localStorage.getItem('generationCount');
+    const savedEmail = localStorage.getItem('userEmail');
+    const savedVerified = localStorage.getItem('isVerified');
+
+    if (savedCount) {
+      setGenerationCount(parseInt(savedCount, 10));
+    }
+
+    if (savedEmail && savedVerified === 'true') {
+      setUserEmail(savedEmail);
+      setIsVerified(true);
+    }
+
+    // Check for pending verification
+    checkPendingVerification();
   }, []);
+
+  const checkPendingVerification = async () => {
+    const pending = localStorage.getItem('pendingVerification');
+    if (pending) {
+      try {
+        const { email } = JSON.parse(pending);
+        const response = await fetch('http://localhost:5000/api/check-user', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email })
+        });
+        
+        const data = await response.json();
+        
+        if (data.verified) {
+          // User is now verified!
+          setIsVerified(true);
+          setUserEmail(email);
+          localStorage.setItem('isVerified', 'true');
+          localStorage.setItem('userEmail', email);
+          localStorage.removeItem('pendingVerification');
+          localStorage.removeItem('generationCount');
+          setGenerationCount(0);
+          setSuccess('Email verified! You can now generate unlimited designs.');
+        }
+      } catch (error) {
+        console.error('Error checking verification:', error);
+      }
+    }
+  };
 
   const handleGenerate = async () => {
     if (!selectedRoom) {
@@ -59,6 +106,13 @@ const App = () => {
     if (!selectedStyle && !customPrompt.trim()) {
       setError('Please select a style or enter a custom prompt');
       return;
+    }
+
+    // ⚠️ CRITICAL FIX: Check BEFORE generation starts
+    if (!isVerified && generationCount >= 2) {
+      setShowRegistrationModal(true);
+      setError('Please register to continue generating designs');
+      return; // STOP HERE - don't generate
     }
 
     setIsGenerating(true);
@@ -78,6 +132,13 @@ const App = () => {
         
         setGeneratedImages(processedImages);
         setSuccess(`Successfully generated ${processedImages.length} design(s)!`);
+
+        // Increment generation count only if not verified
+        if (!isVerified) {
+          const newCount = generationCount + 1;
+          setGenerationCount(newCount);
+          localStorage.setItem('generationCount', newCount.toString());
+        }
       } else {
         setError('No images were generated. Please try again.');
       }
@@ -87,6 +148,12 @@ const App = () => {
     } finally {
       setIsGenerating(false);
     }
+  };
+
+  const handleRegistrationSuccess = (data) => {
+    console.log('Registration successful:', data);
+    // Modal will show verification message
+    // User needs to verify email before continuing
   };
 
   const downloadImage = (imageUrl, index) => {
@@ -117,6 +184,26 @@ const App = () => {
               API Status: {apiStatus === 'connected' ? 'Connected' : apiStatus === 'disconnected' ? 'Disconnected' : 'Checking...'}
             </span>
           </div>
+
+          {/* Generation Counter (only show if not verified) */}
+          {!isVerified && (
+            <div style={{ marginTop: '1rem', display: 'inline-flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem 1rem', borderRadius: '9999px', background: generationCount >= 2 ? '#fef3c7' : 'white', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+              <Sparkles size={16} color={generationCount >= 2 ? '#d97706' : '#9333ea'} />
+              <span style={{ fontSize: '0.875rem', color: generationCount >= 2 ? '#92400e' : '#6b7280', fontWeight: '500' }}>
+                {generationCount}/2 free generations used
+              </span>
+            </div>
+          )}
+
+          {/* Verified Badge */}
+          {isVerified && (
+            <div style={{ marginTop: '1rem', display: 'inline-flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem 1rem', borderRadius: '9999px', background: '#ecfdf5', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+              <CheckCircle size={16} color="#10b981" />
+              <span style={{ fontSize: '0.875rem', color: '#047857', fontWeight: '500' }}>
+                ✨ Unlimited generations • {userEmail}
+              </span>
+            </div>
+          )}
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem' }}>
@@ -344,6 +431,13 @@ const App = () => {
           </div>
         </div>
       </div>
+
+      {/* Registration Modal */}
+      <RegistrationModal
+        isOpen={showRegistrationModal}
+        onClose={() => setShowRegistrationModal(false)}
+        onSuccess={handleRegistrationSuccess}
+      />
 
       <style>{`
         @keyframes spin {
