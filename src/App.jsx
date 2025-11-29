@@ -359,10 +359,10 @@ const App = () => {
                 Powered by
               </span>
               <img 
-                src="src/assets/logo.png" 
-                alt="PropDeck Logo" 
-                style={{ height: '24px', width: 'auto' }}
-              />
+  src="/logo.png"  // ✅ Correct - starts with / for public folder
+  alt="PropDeck Logo" 
+  style={{ height: '24px', width: 'auto' }}
+/>
             </div>
 
             {/* Messages */}
