@@ -512,7 +512,6 @@
 
 // export default App;
 
-
 import React, { useState, useEffect } from 'react';
 import { Sparkles, Download, Home, Bed, Briefcase, UtensilsCrossed, Loader2, AlertCircle, CheckCircle, Share2, Sofa } from 'lucide-react';
 import { generateDesignAsync, checkJobStatus, checkHealth, checkSession, incrementGeneration } from './api';
@@ -545,11 +544,11 @@ const App = () => {
 
   const rooms = [
     { id: 'master_bedroom', name: 'Master Bedroom', icon: Bed },
-    { id: 'bedroom_1', name: 'Bedroom 1', icon: Bed },
-    { id: 'bedroom_2', name: 'Bedroom 2', icon: Bed },
+    // { id: 'bedroom_1', name: 'Bedroom 1', icon: Bed },
+    // { id: 'bedroom_2', name: 'Bedroom 2', icon: Bed },
     { id: 'living_room', name: 'Living Room', icon: Sofa },
     { id: 'kitchen', name: 'Kitchen', icon: Briefcase },
-    { id: 'dining_room', name: 'Dining Room', icon: UtensilsCrossed }
+    // { id: 'dining_room', name: 'Dining Room', icon: UtensilsCrossed }
   ];
 
   const styles = [
@@ -728,12 +727,8 @@ const App = () => {
 
               console.log('[APP] Generation count updated:', newCount);
               
-              if (newCount >= 2) {
-                setTimeout(() => {
-                  setShowRegistrationModal(true);
-                  setError('⚠️ You\'ve used your 2 free generations. Register now to continue creating!');
-                }, 1000);
-              }
+              // ✅ REMOVED: Auto-popup after 2nd generation
+              // Modal will only show when user tries to generate 3rd image
             }
             
             return;
@@ -799,30 +794,30 @@ const App = () => {
     document.body.removeChild(link);
   };
 
-  const shareImage = async (imageUrl) => {
-    try {
-      if (navigator.share) {
-        const response = await fetch(imageUrl);
-        const blob = await response.blob();
-        const file = new File([blob], 'design.png', { type: 'image/png' });
+  // const shareImage = async (imageUrl) => {
+  //   try {
+  //     if (navigator.share) {
+  //       const response = await fetch(imageUrl);
+  //       const blob = await response.blob();
+  //       const file = new File([blob], 'design.png', { type: 'image/png' });
         
-        await navigator.share({
-          title: 'AI Interior Design',
-          text: 'Check out this amazing interior design!',
-          files: [file]
-        });
-        setSuccess('✓ Shared successfully!');
-      } else {
-        await navigator.clipboard.writeText(window.location.href);
-        setSuccess('✓ Link copied to clipboard!');
-      }
-    } catch (error) {
-      if (error.name !== 'AbortError') {
-        console.error('Share error:', error);
-        setError('Failed to share. Please try again.');
-      }
-    }
-  };
+  //       await navigator.share({
+  //         title: 'AI Interior Design',
+  //         text: 'Check out this amazing interior design!',
+  //         files: [file]
+  //       });
+  //       setSuccess('✓ Shared successfully!');
+  //     } else {
+  //       await navigator.clipboard.writeText(window.location.href);
+  //       setSuccess('✓ Link copied to clipboard!');
+  //     }
+  //   } catch (error) {
+  //     if (error.name !== 'AbortError') {
+  //       console.error('Share error:', error);
+  //       setError('Failed to share. Please try again.');
+  //     }
+  //   }
+  // };
 
   return (
     <div style={{ height: '100vh', background: 'linear-gradient(135deg, #f5f3ff 0%, #ffffff 50%, #eff6ff 100%)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
@@ -1021,8 +1016,8 @@ const App = () => {
                             setSelectedImageIndex(idx);
                           }}
                           style={{
-                            minWidth: '80px',
-                            height: '80px',
+                            minWidth: '60px',
+                            height: '60px',
                             border: selectedImageIndex === idx
                               ? '3px solid #9333ea' 
                               : '2px solid #e5e7eb',
@@ -1092,6 +1087,7 @@ const App = () => {
                       </div>
                       
                       <div style={{ display: 'flex', gap: '0.5rem' }}>
+                        {/* Share button commented out
                         <button
                           onClick={() => shareImage(image.url)}
                           style={{
@@ -1124,6 +1120,7 @@ const App = () => {
                         >
                           <Share2 size={18} />
                         </button>
+                        */}
                         
                         <button
                           onClick={() => downloadImage(image, index)}
