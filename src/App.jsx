@@ -670,8 +670,8 @@ const App = () => {
       // ✅ FIXED: Use Cloudinary URL if available, fallback to base64
       const processedImages = [{
         id: result.images[0].id || Date.now(),
-        url: result.images[0].cloudinary_url || `data:image/png;base64,${result.images[0].image_base64}`,
-        cloudinaryUrl: result.images[0].cloudinary_url,
+        url: result.images[0].image_url || result.images[0].cloudinary_url || `data:image/png;base64,${result.images[0].image_base64}`,
+        cloudinaryUrl: result.images[0].image_url || result.images[0].cloudinary_url,
         style: result.images[0].style || selectedStyle || 'custom',
         roomType: result.images[0].room_type || selectedRoom,
         timestamp: Date.now()
@@ -684,7 +684,7 @@ const App = () => {
       try {
         const lightweightHistory = newHistory.slice(0, 20).map(img => ({
           id: img.id,
-          url: img.cloudinaryUrl || img.url,
+          url: img.cloudinaryUrl || (img.url.startsWith('http') ? img.url : null),
           style: img.style,
           roomType: img.roomType,
           timestamp: img.timestamp
