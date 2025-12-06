@@ -149,8 +149,8 @@ const api = axios.create({
 // ============================================
 // ORIGINAL FUNCTION (Keep for backward compatibility)
 // ============================================
-export const generateDesign = async (roomType, style, customPrompt, clientName = 'skyline') => {
-  console.log('[API] generateDesign called with:', { roomType, style, customPrompt, clientName });
+export const generateDesign = async (roomType, style, customPrompt, clientName = 'skyline', model = 'imagen3') => {
+  console.log('[API] generateDesign called with:', { roomType, style, customPrompt, clientName, model });
   console.log('[API] Fetching from:', `${API_BASE_URL}/api/generate-design`);
   
   const response = await fetch(`${API_BASE_URL}/api/generate-design`, {
@@ -162,7 +162,8 @@ export const generateDesign = async (roomType, style, customPrompt, clientName =
       room_type: roomType,
       style: style,
       custom_prompt: customPrompt,
-      client_name: clientName
+      client_name: clientName,
+      model: model  // 🆕 ADDED MODEL PARAMETER
     }),
   });
 
@@ -182,11 +183,11 @@ export const generateDesign = async (roomType, style, customPrompt, clientName =
 // ============================================
 
 // Start async generation - returns job_id immediately
-export const generateDesignAsync = async (roomType, style, customPrompt, clientName = 'skyline') => {
-  console.log('[API] generateDesignAsync called with:', { roomType, style, customPrompt, clientName });
-  console.log('[API] Fetching from:', `${API_BASE_URL}/api/generate-design-async`);
+export const generateDesignAsync = async (roomType, style, customPrompt, clientName = 'skyline', model = 'imagen3') => {
+  console.log('[API] generateDesignAsync called with:', { roomType, style, customPrompt, clientName, model });
+  console.log('[API] Fetching from:', `${API_BASE_URL}/api/generate-design`);
   
-  const response = await fetch(`${API_BASE_URL}/api/generate-design-async`, {
+  const response = await fetch(`${API_BASE_URL}/api/generate-design`, {  // ✅ FIXED: Using correct endpoint
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -195,7 +196,8 @@ export const generateDesignAsync = async (roomType, style, customPrompt, clientN
       room_type: roomType,
       style: style,
       custom_prompt: customPrompt,
-      client_name: clientName
+      client_name: clientName,
+      model: model  // 🆕 ADDED MODEL PARAMETER
     }),
   });
 

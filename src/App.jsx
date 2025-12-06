@@ -514,7 +514,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Sparkles, Download, Home, Bed, Briefcase, UtensilsCrossed, Loader2, AlertCircle, CheckCircle, Share2, Sofa } from 'lucide-react';
-import { generateDesignAsync, checkJobStatus, checkHealth, checkSession, incrementGeneration } from './api';
+import { generateDesign, checkHealth, checkSession, incrementGeneration } from './api';
 import RegistrationModal from './RegistrationModal';
 import './App.css';
 
@@ -532,9 +532,7 @@ const App = () => {
   const [success, setSuccess] = useState('');
   const [apiStatus, setApiStatus] = useState('checking');
   
-  const [jobId, setJobId] = useState(null);
   const [progress, setProgress] = useState(0);
-  const [generationStatus, setGenerationStatus] = useState('');
   
   const [showRegistrationModal, setShowRegistrationModal] = useState(false);
   const [generationCount, setGenerationCount] = useState(0);
@@ -588,6 +586,7 @@ const App = () => {
       }
     } catch (error) {
       console.error('[APP] Error restoring image history:', error);
+      sessionStorage.removeItem('imageHistory');
     }
 
     const registeredEmail = localStorage.getItem('userEmail');
@@ -652,117 +651,76 @@ const App = () => {
     setError('');
     setSuccess('');
     setProgress(0);
-    setGenerationStatus('pending');
 
     try {
-      console.log('[APP] Starting async generation...');
-      const jobData = await generateDesignAsync(selectedRoom, selectedStyle, customPrompt, clientName);
+      console.log('[APP] Starting generation...');
+      setProgress(10);
       
-      if (!jobData.success || !jobData.job_id) {
-        throw new Error(jobData.error || 'Failed to start generation');
+      const result = await generateDesign(selectedRoom, selectedStyle, customPrompt, clientName);
+      
+      setProgress(50);
+      
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to generate');
       }
 
-      const newJobId = jobData.job_id;
-      setJobId(newJobId);
-      setGenerationStatus('processing');
-      console.log('[APP] ✅ Job started:', newJobId);
-
-      let pollAttempts = 0;
-      const maxAttempts = 90;
+      console.log('[APP] 🎉 Generation completed!');
+      setProgress(80);
       
-      const pollInterval = setInterval(async () => {
-        pollAttempts++;
+      // ✅ FIXED: Use Cloudinary URL if available, fallback to base64
+      const processedImages = [{
+        id: result.images[0].id || Date.now(),
+        url: result.images[0].cloudinary_url || `data:image/png;base64,${result.images[0].image_base64}`,
+        cloudinaryUrl: result.images[0].cloudinary_url,
+        style: result.images[0].style || selectedStyle || 'custom',
+        roomType: result.images[0].room_type || selectedRoom,
+        timestamp: Date.now()
+      }];
+      
+      const newHistory = [...processedImages, ...imageHistory];
+      setImageHistory(newHistory);
+      
+      // ✅ FIXED: Save only URLs to sessionStorage (lightweight)
+      try {
+        const lightweightHistory = newHistory.slice(0, 20).map(img => ({
+          id: img.id,
+          url: img.cloudinaryUrl || img.url,
+          style: img.style,
+          roomType: img.roomType,
+          timestamp: img.timestamp
+        })).filter(img => img.url && img.url.startsWith('http'));
+        
+        sessionStorage.setItem('imageHistory', JSON.stringify(lightweightHistory));
+        console.log('[APP] Saved', lightweightHistory.length, 'image URLs to session');
+      } catch (error) {
+        console.error('[APP] Error saving to sessionStorage:', error);
+        sessionStorage.clear();
+      }
+      
+      setSelectedImageIndex(0);
+      setSuccess('✅ Design generated successfully!');
+      setProgress(100);
+
+      if (!isRegistered) {
+        const newCount = generationCount + 1;
+        setGenerationCount(newCount);
+        localStorage.setItem('generationCount', newCount.toString());
         
         try {
-          const statusData = await checkJobStatus(newJobId);
-          
-          console.log(`[APP] 📊 Job status: ${statusData.status} - ${statusData.progress}%`);
-          
-          setProgress(statusData.progress || 0);
-          setGenerationStatus(statusData.status);
-          
-          if (statusData.status === 'completed') {
-            clearInterval(pollInterval);
-            setIsGenerating(false);
-            
-            console.log('[APP] 🎉 Generation completed!');
-            
-            const result = statusData.result;
-            
-            const processedImages = [{
-              id: result.id || Date.now(),
-              url: `data:image/png;base64,${result.image_base64}`,
-              style: result.style || selectedStyle || 'custom',
-              roomType: result.room_type || selectedRoom,
-              timestamp: Date.now()
-            }];
-            
-            const newHistory = [...processedImages, ...imageHistory];
-            setImageHistory(newHistory);
-            
-            try {
-              sessionStorage.setItem('imageHistory', JSON.stringify(newHistory));
-              console.log('[APP] Saved', newHistory.length, 'images to session');
-            } catch (error) {
-              console.error('[APP] Error saving to sessionStorage:', error);
-              const limitedHistory = newHistory.slice(0, 10);
-              sessionStorage.setItem('imageHistory', JSON.stringify(limitedHistory));
-              setImageHistory(limitedHistory);
-            }
-            
-            setSelectedImageIndex(0);
-            setSuccess('✅ Design generated successfully!');
-            setProgress(100);
-
-            if (!isRegistered) {
-              const newCount = generationCount + 1;
-              setGenerationCount(newCount);
-              localStorage.setItem('generationCount', newCount.toString());
-              
-              try {
-                await incrementGeneration(sessionId, selectedRoom, selectedStyle, customPrompt, clientName);
-              } catch (err) {
-                console.error('[APP] Error updating server count:', err);
-              }
-
-              console.log('[APP] Generation count updated:', newCount);
-              
-              // ✅ REMOVED: Auto-popup after 2nd generation
-              // Modal will only show when user tries to generate 3rd image
-            }
-            
-            return;
-          }
-          
-          if (statusData.status === 'failed') {
-            clearInterval(pollInterval);
-            setIsGenerating(false);
-            setError(statusData.error || 'Generation failed. Please try again.');
-            setProgress(0);
-            console.error('[APP] ❌ Job failed:', statusData.error);
-            return;
-          }
-          
-          if (pollAttempts >= maxAttempts) {
-            clearInterval(pollInterval);
-            setIsGenerating(false);
-            setError('⏱️ Generation timeout. Please try again.');
-            setProgress(0);
-            console.error('[APP] ⏱️ Polling timeout');
-            return;
-          }
-          
-        } catch (pollError) {
-          console.error('[APP] Polling error:', pollError);
+          await incrementGeneration(sessionId, selectedRoom, selectedStyle, customPrompt, clientName);
+        } catch (err) {
+          console.error('[APP] Error updating server count:', err);
         }
-        
-      }, 2000);
+
+        console.log('[APP] Generation count updated:', newCount);
+      }
 
     } catch (err) {
       console.error('[APP] Generation error:', err);
       setError(err.message || 'Failed to generate design. Please try again.');
-      setIsGenerating(false);
       setProgress(0);
+    } finally {
+      setIsGenerating(false);
     }
   };
 
@@ -785,13 +743,35 @@ const App = () => {
     console.log('[APP] User registered and modal closed');
   };
 
-  const downloadImage = (image, index) => {
-    const link = document.createElement('a');
-    link.href = image.url;
-    link.download = `design-${image.roomType}-${image.style}-${index + 1}.png`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+  // ✅ FIXED: Download function to handle both URLs and base64
+  const downloadImage = async (image, index) => {
+    try {
+      if (image.url.startsWith('http')) {
+        // Download from URL
+        const response = await fetch(image.url);
+        const blob = await response.blob();
+        const blobUrl = URL.createObjectURL(blob);
+        
+        const link = document.createElement('a');
+        link.href = blobUrl;
+        link.download = `design-${image.roomType}-${image.style}-${index + 1}.png`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(blobUrl);
+      } else {
+        // Download base64 directly
+        const link = document.createElement('a');
+        link.href = image.url;
+        link.download = `design-${image.roomType}-${image.style}-${index + 1}.png`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      }
+    } catch (error) {
+      console.error('[APP] Download error:', error);
+      setError('Failed to download image');
+    }
   };
 
   // const shareImage = async (imageUrl) => {
@@ -1087,41 +1067,6 @@ const App = () => {
                       </div>
                       
                       <div style={{ display: 'flex', gap: '0.5rem' }}>
-                        {/* Share button commented out
-                        <button
-                          onClick={() => shareImage(image.url)}
-                          style={{
-                            background: 'white',
-                            color: '#111827',
-                            padding: '0.625rem',
-                            borderRadius: '50%',
-                            fontWeight: '600',
-                            border: '2px solid #e5e7eb',
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            boxShadow: '0 2px 4px rgba(0,0,0,0.05)',
-                            width: '45px',
-                            height: '45px',
-                            transition: 'all 0.2s'
-                          }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.borderColor = '#9333ea';
-                            e.currentTarget.style.background = '#faf5ff';
-                            e.currentTarget.style.transform = 'scale(1.05)';
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.borderColor = '#e5e7eb';
-                            e.currentTarget.style.background = 'white';
-                            e.currentTarget.style.transform = 'scale(1)';
-                          }}
-                          title="Share"
-                        >
-                          <Share2 size={18} />
-                        </button>
-                        */}
-                        
                         <button
                           onClick={() => downloadImage(image, index)}
                           style={{
