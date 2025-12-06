@@ -133,7 +133,7 @@
 import axios from 'axios';
 
 // ✅ Railway URL
-const API_BASE_URL = 'https://interior-backend-production.up.railway.app/';
+const API_BASE_URL = 'https://interior-backend-production.up.railway.app';
 
 console.log('[API] Base URL:', API_BASE_URL);
 
